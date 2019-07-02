@@ -54,8 +54,12 @@ namespace EasyChat
 
         public void OnGUI()
         {
-            if (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime > hideAfterSeconds)
+            if (Input.GetKeyDown(KeyCode.T) || allowEnterKey)
+                lastMessageTime = messageTimer.ElapsedMilliseconds * 0.001f;
+
+            if (!VRCUiManagerUtils.GetVRCUiManager().IsActive() && (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime > hideAfterSeconds))
                 return;
+
             if (Event.current.type == EventType.Layout)
             {
                 if (screenHeight != Screen.height)
