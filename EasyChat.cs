@@ -57,7 +57,7 @@ namespace EasyChat
             if (Input.GetKeyDown(KeyCode.T) || allowEnterKey)
                 lastMessageTime = messageTimer.ElapsedMilliseconds * 0.001f;
 
-            if (!VRCUiManagerUtils.GetVRCUiManager().IsActive() && (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime > hideAfterSeconds))
+            if (RoomManager.currentRoom != null && (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime > hideAfterSeconds))
                 return;
 
             if (Event.current.type == EventType.Layout)
