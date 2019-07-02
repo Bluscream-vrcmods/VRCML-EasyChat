@@ -17,6 +17,9 @@ namespace EasyChat
     public class EasyChat : VRCMod
 #endif
     {
+        public static int maxMessagesCounts = 40;
+        public static float hideAfterSeconds = 10;
+
         public static event Action<string> OnMessage;
         public static event Action<string> OnCommand;
 
@@ -32,12 +35,27 @@ namespace EasyChat
         private bool allowEnterKey;
         private string chatInputField = "";
 
-        private int maxMessagesCounts = 40;
         private List<string> messages = new List<string>();
-        private Vector2 scrollValue = new Vector2(0, 0);
+
+        private System.Diagnostics.Stopwatch messageTimer = new System.Diagnostics.Stopwatch();
+        private float lastMessageTime = 0;
+
+#if UNITY_EDITOR
+        public void Start()
+        {
+            OnApplicationStart();
+        }
+#endif
+
+        void OnApplicationStart()
+        {
+            messageTimer.Start();
+        }
 
         public void OnGUI()
         {
+            if (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime > hideAfterSeconds)
+                return;
             if (Event.current.type == EventType.Layout)
             {
                 if (screenHeight != Screen.height)
@@ -134,9 +152,9 @@ namespace EasyChat
             {
                 if (messages.Count > maxMessagesCounts)
                     messages.RemoveAt(0);
-                messages.Add($"[{time.Hour.ToString("D2")}:{time.Minute.ToString("D2")}] {sender} {message}");
             }
-            scrollValue = new Vector2(0, 10000); // scuffed scroll to bottom
+            messages.Add($"[{time.Hour.ToString("D2")}:{time.Minute.ToString("D2")}] {sender} {message}");
+            lastMessageTime = messageTimer.ElapsedMilliseconds * 0.001f;
         }
 
 
@@ -165,7 +183,7 @@ namespace EasyChat
         {
             bool focused = GUI.GetNameOfFocusedControl() == "chatInputField";
 
-            scrollValue = GUILayout.BeginScrollView(scrollValue, focused ? scrollviewStyleActive : scrollviewStyle, GUILayout.Width(450), GUILayout.Height(265));
+            GUILayout.BeginScrollView(Vector2.zero, focused ? scrollviewStyleActive : scrollviewStyle, GUILayout.Width(450), GUILayout.Height(265));
             lock (messages)
             {
                 foreach (string message in messages)
