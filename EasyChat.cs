@@ -37,10 +37,10 @@ namespace EasyChat
         private bool allowEnterKey;
         private string chatInputField = "";
 
-        private List<ChatMessage> messages = new List<ChatMessage>();
+        private static List<ChatMessage> messages = new List<ChatMessage>();
 
-        private System.Diagnostics.Stopwatch messageTimer = new System.Diagnostics.Stopwatch();
-        private float lastMessageTime = 0;
+        private static System.Diagnostics.Stopwatch messageTimer = new System.Diagnostics.Stopwatch();
+        private static float lastMessageTime = 0;
 
 #if UNITY_EDITOR
         public void Start()
@@ -72,9 +72,12 @@ namespace EasyChat
 
             if (Event.current.type == EventType.Layout)
             {
-                RenderChat();
+                if (screenHeight != Screen.height)
+                    RefreshLayout();
                 CheckForKeys();
             }
+
+            RenderChat();
 
             if (Event.current.type == EventType.Repaint)
             {
@@ -87,41 +90,42 @@ namespace EasyChat
             }
         }
 
-        public void RenderChat() {
-            if (screenHeight != Screen.height)
+        private void RefreshLayout()
+        {
+            if (screenHeight == 0)
             {
-                if (screenHeight == 0)
-                {
-                    // Init
-                    chatStyle = new GUIStyle(GUI.skin.box);
-                    chatStyle.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.2f);
-                    chatStyleActive = new GUIStyle(GUI.skin.box);
-                    chatStyleActive.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.6f);
+                // Init
+                chatStyle = new GUIStyle(GUI.skin.box);
+                chatStyle.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.2f);
+                chatStyleActive = new GUIStyle(GUI.skin.box);
+                chatStyleActive.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.6f);
 
-                    scrollviewStyle = new GUIStyle(GUI.skin.scrollView);
-                    scrollviewStyle.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.2f);
-                    scrollviewStyleActive = new GUIStyle(GUI.skin.scrollView);
-                    scrollviewStyleActive.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.6f);
+                scrollviewStyle = new GUIStyle(GUI.skin.scrollView);
+                scrollviewStyle.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.2f);
+                scrollviewStyleActive = new GUIStyle(GUI.skin.scrollView);
+                scrollviewStyleActive.normal.background = CreateTexture(0.1f, 0.9f, 1f, 0.6f);
 
-                    fieldInputStyle = new GUIStyle(GUI.skin.textField);
-                    fieldInputStyle.normal.background = null;
-                    fieldInputStyle.focused.background = null;
-                    fieldInputStyle.hover.background = null;
-                    fieldInputStyle.padding.top = 1;
-                    fieldInputStyle.normal.textColor = Color.black;
-                    fieldInputStyle.focused.textColor = Color.black;
-                    fieldInputStyle.hover.textColor = Color.black;
+                fieldInputStyle = new GUIStyle(GUI.skin.textField);
+                fieldInputStyle.normal.background = null;
+                fieldInputStyle.focused.background = null;
+                fieldInputStyle.hover.background = null;
+                fieldInputStyle.padding.top = 1;
+                fieldInputStyle.normal.textColor = Color.black;
+                fieldInputStyle.focused.textColor = Color.black;
+                fieldInputStyle.hover.textColor = Color.black;
 
-                    textStyle = new GUIStyle(GUI.skin.label);
-                    textStyle.normal.textColor = Color.black;
-                    textStyle.focused.textColor = Color.black;
-                    textStyle.hover.textColor = Color.black;
-                    textStyle.wordWrap = true;
-                }
-                screenHeight = Screen.height;
-                combinedRect = new Rect(5, screenHeight - 310 - 5, 460, 310);
+                textStyle = new GUIStyle(GUI.skin.label);
+                textStyle.normal.textColor = Color.black;
+                textStyle.focused.textColor = Color.black;
+                textStyle.hover.textColor = Color.black;
+                textStyle.wordWrap = true;
             }
+            screenHeight = Screen.height;
+            combinedRect = new Rect(5, screenHeight - 310 - 5, 460, 310);
+        }
 
+        public void RenderChat()
+        {
             GUI.Window(0, combinedRect, DrawWindow, "", chatStyle);
             if (!Initialized) {
                 Initialized = true;
@@ -130,7 +134,9 @@ namespace EasyChat
                 HandleMessage(msg);
             }
         }
-        private void CheckForKeys() {
+
+        private void CheckForKeys()
+        {
             if (allowEnterKey && (chatInputField.Trim().Length > 0) && EnterPressed())
             {
                 string message = chatInputField.Trim();
@@ -169,7 +175,7 @@ namespace EasyChat
             HandleMessage(new ChatMessage(message, time, sender, sanitize: sanitize));
         }*/
 
-        public void HandleMessage(ChatMessage message)
+        public static void HandleMessage(ChatMessage message)
         {
             lock (messages)
             {
