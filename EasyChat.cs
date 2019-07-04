@@ -14,11 +14,12 @@ namespace EasyChat
 #if UNITY_EDITOR
     public class EasyChat : MonoBehaviour
 #else
-    [VRCModInfo("EasyChat", "1.0", "Slaynash")]
+    [VRCModInfo("EasyChat", "1.0.1", "Slaynash, Bluscream", "")]
     public class EasyChat : VRCMod
 #endif
     {
-        private bool Initialized = false;
+        private static VRCModInfoAttribute ModInfo;
+        private static bool Initialized = false;
 
         public static event Action<ChatMessage> OnMessage;
         public static event Action<ChatCommand> OnCommand;
@@ -29,7 +30,7 @@ namespace EasyChat
         private float screenHeight = 0;
         private GUIStyle chatStyle;
         private GUIStyle chatStyleActive;
-        private GUIStyle textStyle;
+        // private GUIStyle textStyle;
         private GUIStyle fieldInputStyle;
         private GUIStyle scrollviewStyle;
         private GUIStyle scrollviewStyleActive;
@@ -37,44 +38,47 @@ namespace EasyChat
         private bool allowEnterKey;
         private string chatInputField = "";
 
-        private static List<ChatMessage> messages = new List<ChatMessage>();
+        public static List<ChatMessage> messages = new List<ChatMessage>();
 
         private static System.Diagnostics.Stopwatch messageTimer = new System.Diagnostics.Stopwatch();
         private static float lastMessageTime = 0;
 
 #if UNITY_EDITOR
-        public void Start()
-        {
-            OnApplicationStart();
-        }
+        public void Start() { OnApplicationStart(); }
 #endif
 
         void OnApplicationStart()
         {
+            ModInfo = Attribute.GetCustomAttribute(typeof(EasyChat), typeof(VRCModInfoAttribute)) as VRCModInfoAttribute;
             VRCTools.ModPrefs.RegisterCategory(prefSection, "EasyChat");
             VRCTools.ModPrefs.RegisterPrefInt(prefSection, "maxmessages", 50, "Max Messages");
             VRCTools.ModPrefs.RegisterPrefInt(prefSection, "hideafter", 30, "Hide after (seconds)");
+            VRCTools.ModPrefs.RegisterPrefString(prefSection, "cmdprefix", "/", "Command Prefix");
             messageTimer.Start();
         }
 
-        private bool MessagTimerExceeded()
-        {
+        private bool MessagTimerExceeded() {
             return (messageTimer.ElapsedMilliseconds * 0.001f - lastMessageTime) > VRCTools.ModPrefs.GetInt(prefSection, "hideafter");
         }
 
-        public void OnGUI()
-        {
+        public void OnGUI() {
             if (Input.GetKeyDown(KeyCode.Return) || allowEnterKey)
+            {
                 lastMessageTime = messageTimer.ElapsedMilliseconds * 0.001f;
+            }
 
             if (RoomManager.currentRoom != null && MessagTimerExceeded())
+            {
                 return;
+            }
 
             if (Event.current.type == EventType.Layout)
             {
                 if (screenHeight != Screen.height)
+                {
                     RefreshLayout();
-                CheckForKeys();
+                }
+                CheckForKeys(Event.current);
             }
 
             RenderChat();
@@ -82,11 +86,12 @@ namespace EasyChat
             if (Event.current.type == EventType.Repaint)
             {
 #if !UNITY_EDITOR
-                if (!VRCUiManagerUtils.GetVRCUiManager().IsActive() && ChatHotkeyPressed())
+                if (!VRCUiManagerUtils.GetVRCUiManager().IsActive() && ChatHotkeyPressed()) {
 #else
-                if (ChatHotkeyPressed())
+                if (ChatHotkeyPressed()) {
 #endif
                     GUI.FocusControl("chatInputField");
+                }
             }
         }
 
@@ -113,12 +118,6 @@ namespace EasyChat
                 fieldInputStyle.normal.textColor = Color.black;
                 fieldInputStyle.focused.textColor = Color.black;
                 fieldInputStyle.hover.textColor = Color.black;
-
-                textStyle = new GUIStyle(GUI.skin.label);
-                textStyle.normal.textColor = Color.black;
-                textStyle.focused.textColor = Color.black;
-                textStyle.hover.textColor = Color.black;
-                textStyle.wordWrap = true;
             }
             screenHeight = Screen.height;
             combinedRect = new Rect(5, screenHeight - 310 - 5, 460, 310);
@@ -129,23 +128,22 @@ namespace EasyChat
             GUI.Window(0, combinedRect, DrawWindow, "", chatStyle);
             if (!Initialized) {
                 Initialized = true;
-                var msg = new ChatMessage(content: "initialized", timestamp: DateTime.Now, sender: "EasyChat");
-                msg.Color = Color.cyan;
+                var msg = new ChatMessage(content: $"{ModInfo.Name} v{ModInfo.Version} initialized!", timestamp: DateTime.Now); // msg.Color = Color.gray;
                 HandleMessage(msg);
+                Utils.Log(ModInfo.ToJson());
             }
         }
 
-        private void CheckForKeys()
+        private void CheckForKeys(Event _event)
         {
-            if (allowEnterKey && (chatInputField.Trim().Length > 0) && EnterPressed())
-            {
+            if (allowEnterKey && (chatInputField.Trim().Length > 0) && EnterPressed(_event)) {
                 string message = chatInputField.Trim();
 
                 chatInputField = "";
                 allowEnterKey = false;
                 GUIUtility.keyboardControl = 0;
 
-                if (message.StartsWith("/"))
+                if (message.StartsWith(VRCTools.ModPrefs.GetString(prefSection, "cmdprefix")))
                 {
                     Utils.Log("OnCommand " + message);
                     OnCommand?.Invoke(new ChatCommand(message));
@@ -153,7 +151,11 @@ namespace EasyChat
                 else
                 {
                     Utils.Log("OnMessage " + message);
-                    var msg = new ChatMessage(content: message, timestamp: DateTime.Now, apiuser: (APIUser.CurrentUser!=null?APIUser.CurrentUser:null));
+                    object Sender;
+                    if (APIUser.CurrentUser is null) {
+                        Sender = "You"; 
+                    } else { Sender = APIUser.CurrentUser; }
+                    var msg = new ChatMessage(content: message, timestamp: DateTime.Now, sender: Sender);
 #if UNITY_EDITOR
                     HandleMessage(msg, DateTime.Now, "Me");
 #else
@@ -177,11 +179,14 @@ namespace EasyChat
 
         public static void HandleMessage(ChatMessage message)
         {
+            if (!Initialized) return;
+            if (message is null || string.IsNullOrEmpty(message.Content)) return;
             lock (messages)
             {
                 if (messages.Count > VRCTools.ModPrefs.GetInt(prefSection, "maxmessages"))
                     messages.RemoveAt(0);
             }
+            message.String = message.ToMessageString();
             Utils.Log("New Message:" + message.ToJson()); // Utils.JsonConverter.Serialize(
             messages.Add(message);
             lastMessageTime = messageTimer.ElapsedMilliseconds * 0.001f;
@@ -192,9 +197,10 @@ namespace EasyChat
             return !Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.T);
         }
 
-        private bool EnterPressed()
+        private bool EnterPressed(Event _event = null)
         {
-            KeyCode kc = Event.current.keyCode;
+            if (_event is null) _event = Event.current;
+            KeyCode kc = _event.keyCode;
             return kc == KeyCode.Return || kc == KeyCode.KeypadEnter;
         }
 
@@ -217,16 +223,15 @@ namespace EasyChat
             {
                 foreach (var message in messages)
                 {
-                    var txtStyle = textStyle;
-                    if (message.Color != null) {
-                        txtStyle = new GUIStyle(GUI.skin.label);
-                        txtStyle.normal.textColor = message.Color;
-                        txtStyle.focused.textColor = message.Color;
-                        txtStyle.hover.textColor = message.Color;
-                        txtStyle.wordWrap = true;
+                    var textStyle = new GUIStyle(GUI.skin.label);
+                    if (message.Color is UnityEngine.Color color) {
+                        textStyle.normal.textColor = textStyle.focused.textColor = textStyle.hover.textColor = color;
+                    } else {
+                        textStyle.normal.textColor = textStyle.focused.textColor = textStyle.hover.textColor = Color.black;
                     }
-                    GUILayout.Label(message.String, txtStyle);
-                    Console.WriteLine(message.String);
+                    textStyle.wordWrap = true;
+                    GUILayout.Label(message.String, textStyle);
+                    // Console.WriteLine(message.String);
                 }
             }
             GUILayout.EndScrollView();
